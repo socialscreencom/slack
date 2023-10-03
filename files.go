@@ -70,6 +70,19 @@ type File struct {
 	Thumb1024W  int    `json:"thumb_1024_w"`
 	Thumb1024H  int    `json:"thumb_1024_h"`
 
+	Vtt      string `json:"vtt"`
+	Hls      string `json:"hls"`
+	HlsEmbed string `json:"hls_embed"`
+
+	Mp4              string `json:"mp4"`
+	Mp4Low           string `json:"mp4_low"`
+	DurationMs       int    `json:"duration_ms"`
+	MediaDisplayType string `json:"media_display_type"`
+
+	ThumbVideo  string `json:"thumb_video"`
+	ThumbVideoW int    `json:"thumb_video_w"`
+	ThumbVideoH int    `json:"thumb_video_h"`
+
 	Permalink       string `json:"permalink"`
 	PermalinkPublic string `json:"permalink_public"`
 
