@@ -6,40 +6,54 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         go:
-          - '1.18'
-          - '1.19'
-          - '1.20'
-          - '1.21'
-          - '1.22'
-          - '1.23'
+          - "1.26"
+          - "1.27"
     name: test go-${{ matrix.go }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
       - name: run test
         run: go test -v -race ./...
-        env:
-          GO111MODULE: on
+
   lint:
-    runs-on: ubuntu-22.04
-    name: lint
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        go:
+          - "1.26"
+          - "1.27"
+    name: lint go-${{ matrix.go }}
     steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.20'
+          go-version: ${{ matrix.go }}
           cache: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@aaa42aa0628b4ae2578232a66b541047968fac86 # v6.1.0
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v1.52.2
+          version: v2.14.0
+      - name: staticcheck
+        uses: dominikh/staticcheck-action@9716614d4101e79b4340dd97b10e54d68234e431 # 1.4.1
+        with:
+          version: "2026.2"
+      - name: Check 'go mod tidy' makes no changes
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "❌ go.mod or go.sum files are not tidy. Please run 'go mod tidy' and commit the changes."
+            exit 1
+          fi

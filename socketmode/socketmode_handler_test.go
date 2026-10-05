@@ -16,17 +16,23 @@ func init_SocketmodeHandler() *SocketmodeHandler {
 	interactioneventMap := make(map[slack.InteractionType][]SocketmodeHandlerFunc)
 	eventApiMap := make(map[slackevents.EventsAPIType][]SocketmodeHandlerFunc)
 	interactionBlockActionEventMap := make(map[string]SocketmodeHandlerFunc)
+	shortcutMap := make(map[string]SocketmodeHandlerFunc)
+	viewSubmissionMap := make(map[string]SocketmodeHandlerFunc)
+	viewClosedMap := make(map[string]SocketmodeHandlerFunc)
 	slashCommandMap := make(map[string]SocketmodeHandlerFunc)
 
 	return &SocketmodeHandler{
 		Client: &Client{
 			log: log.New(os.Stderr, "slack-go/slack/socketmode", log.LstdFlags|log.Lshortfile),
 		},
-		EventMap:                       eventMap,
-		EventApiMap:                    eventApiMap,
-		InteractionEventMap:            interactioneventMap,
-		InteractionBlockActionEventMap: interactionBlockActionEventMap,
-		SlashCommandMap:                slashCommandMap,
+		EventMap:                          eventMap,
+		EventApiMap:                       eventApiMap,
+		InteractionEventMap:               interactioneventMap,
+		InteractionBlockActionEventMap:    interactionBlockActionEventMap,
+		InteractionShortcutEventMap:       shortcutMap,
+		InteractionViewSubmissionEventMap: viewSubmissionMap,
+		InteractionViewClosedEventMap:     viewClosedMap,
+		SlashCommandMap:                   slashCommandMap,
 	}
 }
 
@@ -53,27 +59,39 @@ func testing_wrapper(ch chan<- string, f SocketmodeHandlerFunc) SocketmodeHandle
 }
 
 func middleware_interaction(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
 }
 
 func middleware_interaction_block_action(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
 }
 
 func middleware_eventapi(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
 }
 
 func middleware(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
 }
 
 func defaultmiddleware(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
 }
 
 func middleware_slach_command(evt *Event, client *Client) {
-	//do nothing
+	// do nothing
+}
+
+func middleware_shortcut(evt *Event, client *Client) {
+	// do nothing
+}
+
+func middleware_view_submission(evt *Event, client *Client) {
+	// do nothing
+}
+
+func middleware_view_closed(evt *Event, client *Client) {
+	// do nothing
 }
 
 func TestSocketmodeHandler_Handle(t *testing.T) {
@@ -84,7 +102,7 @@ func TestSocketmodeHandler_Handle(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string //what is the name of the function we want to be called
+		want string // the name of the function we want to be called
 	}{
 		{
 			name: "Event Match registered function",
@@ -134,7 +152,7 @@ func TestSocketmodeHandler_HandleInteraction(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string //what is the name of the function we want to be called
+		want string // the name of the function we want to be called
 	}{
 		{
 			name: "Event Match registered function",
@@ -222,7 +240,7 @@ func TestSocketmodeHandler_HandleEvents(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string //what is the name of the function we want to be called
+		want string // the name of the function we want to be called
 	}{
 		{
 			name: "Event Match registered function",
@@ -319,7 +337,7 @@ func TestSocketmodeHandler_HandleInteractionBlockAction(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string //what is the name of the function we want to be called
+		want string // the name of the function we want to be called
 	}{
 		{
 			name: "Event Match registered function",
@@ -390,7 +408,7 @@ func TestSocketmodeHandler_HandleSlashCommand(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string //what is the name of the function we want to be called
+		want string // the name of the function we want to be called
 	}{
 		{
 			name: "Event Match registered function",
@@ -419,6 +437,215 @@ func TestSocketmodeHandler_HandleSlashCommand(t *testing.T) {
 				},
 				register: func(r *SocketmodeHandler, c chan<- string) {
 					r.HandleSlashCommand("/rocket", testing_wrapper(c, middleware_slach_command))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.defaultmiddleware",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := init_SocketmodeHandler()
+
+			c := make(chan string)
+
+			tt.args.register(r, c)
+			r.HandleDefault(testing_wrapper(c, defaultmiddleware))
+
+			r.dispatcher(tt.args.evt)
+
+			got := <-c
+
+			if got != tt.want {
+				t.Fatalf("%s was not called for EventTy(\"%v\"), got %v", tt.want, tt.args.evt.Type, got)
+			}
+		})
+	}
+}
+
+func TestSocketmodeHandler_HandleShortcut(t *testing.T) {
+	type args struct {
+		evt      Event
+		register func(*SocketmodeHandler, chan<- string)
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Global shortcut matches registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type:       slack.InteractionTypeShortcut,
+						CallbackID: "open_ticket",
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("open_ticket", testing_wrapper(c, middleware_shortcut))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.middleware_shortcut",
+		}, {
+			name: "Message action matches registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type:       slack.InteractionTypeMessageAction,
+						CallbackID: "save_message",
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("save_message", testing_wrapper(c, middleware_shortcut))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.middleware_shortcut",
+		}, {
+			name: "Event do not Match any registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type:       slack.InteractionTypeShortcut,
+						CallbackID: "other_shortcut",
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("open_ticket", testing_wrapper(c, middleware_shortcut))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.defaultmiddleware",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := init_SocketmodeHandler()
+
+			c := make(chan string)
+
+			tt.args.register(r, c)
+			r.HandleDefault(testing_wrapper(c, defaultmiddleware))
+
+			r.dispatcher(tt.args.evt)
+
+			got := <-c
+
+			if got != tt.want {
+				t.Fatalf("%s was not called for EventTy(\"%v\"), got %v", tt.want, tt.args.evt.Type, got)
+			}
+		})
+	}
+}
+
+func TestSocketmodeHandler_HandleViewSubmission(t *testing.T) {
+	type args struct {
+		evt      Event
+		register func(*SocketmodeHandler, chan<- string)
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Event Match registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type: slack.InteractionTypeViewSubmission,
+						View: slack.View{
+							CallbackID: "create_ticket",
+						},
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewSubmission("create_ticket", testing_wrapper(c, middleware_view_submission))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.middleware_view_submission",
+		}, {
+			name: "Event do not Match any registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type: slack.InteractionTypeViewSubmission,
+						View: slack.View{
+							CallbackID: "other_modal",
+						},
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewSubmission("create_ticket", testing_wrapper(c, middleware_view_submission))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.defaultmiddleware",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := init_SocketmodeHandler()
+
+			c := make(chan string)
+
+			tt.args.register(r, c)
+			r.HandleDefault(testing_wrapper(c, defaultmiddleware))
+
+			r.dispatcher(tt.args.evt)
+
+			got := <-c
+
+			if got != tt.want {
+				t.Fatalf("%s was not called for EventTy(\"%v\"), got %v", tt.want, tt.args.evt.Type, got)
+			}
+		})
+	}
+}
+
+func TestSocketmodeHandler_HandleViewClosed(t *testing.T) {
+	type args struct {
+		evt      Event
+		register func(*SocketmodeHandler, chan<- string)
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Event Match registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type: slack.InteractionTypeViewClosed,
+						View: slack.View{
+							CallbackID: "create_ticket",
+						},
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewClosed("create_ticket", testing_wrapper(c, middleware_view_closed))
+				},
+			},
+			want: "github.com/slack-go/slack/socketmode.middleware_view_closed",
+		}, {
+			name: "Event do not Match any registered function",
+			args: args{
+				evt: Event{
+					Type: EventTypeInteractive,
+					Data: slack.InteractionCallback{
+						Type: slack.InteractionTypeViewClosed,
+						View: slack.View{
+							CallbackID: "other_modal",
+						},
+					},
+				},
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewClosed("create_ticket", testing_wrapper(c, middleware_view_closed))
 				},
 			},
 			want: "github.com/slack-go/slack/socketmode.defaultmiddleware",
@@ -494,6 +721,72 @@ func TestSocketmodeHandler_Handle_errors(t *testing.T) {
 				register: func(r *SocketmodeHandler, c chan<- string) {
 					r.HandleInteractionBlockAction("action_id", testing_wrapper(c, middleware_interaction_block_action))
 					r.HandleInteractionBlockAction("action_id", testing_wrapper(c, middleware_interaction_block_action))
+				},
+			},
+		}, {
+			name: "Attempt to register empty Shortcut callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("", testing_wrapper(c, middleware_shortcut))
+				},
+			},
+		}, {
+			name: "Attempt to register nil Shortcut handler",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("callback_id", nil)
+				},
+			},
+		}, {
+			name: "Attempt to register duplicate Shortcut callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleShortcut("callback_id", testing_wrapper(c, middleware_shortcut))
+					r.HandleShortcut("callback_id", testing_wrapper(c, middleware_shortcut))
+				},
+			},
+		}, {
+			name: "Attempt to register empty ViewSubmission callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewSubmission("", testing_wrapper(c, middleware_view_submission))
+				},
+			},
+		}, {
+			name: "Attempt to register nil ViewSubmission handler",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewSubmission("callback_id", nil)
+				},
+			},
+		}, {
+			name: "Attempt to register duplicate ViewSubmission callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewSubmission("callback_id", testing_wrapper(c, middleware_view_submission))
+					r.HandleViewSubmission("callback_id", testing_wrapper(c, middleware_view_submission))
+				},
+			},
+		}, {
+			name: "Attempt to register empty ViewClosed callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewClosed("", testing_wrapper(c, middleware_view_closed))
+				},
+			},
+		}, {
+			name: "Attempt to register nil ViewClosed handler",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewClosed("callback_id", nil)
+				},
+			},
+		}, {
+			name: "Attempt to register duplicate ViewClosed callbackID",
+			args: args{
+				register: func(r *SocketmodeHandler, c chan<- string) {
+					r.HandleViewClosed("callback_id", testing_wrapper(c, middleware_view_closed))
+					r.HandleViewClosed("callback_id", testing_wrapper(c, middleware_view_closed))
 				},
 			},
 		},

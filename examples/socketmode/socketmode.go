@@ -1,3 +1,24 @@
+// This example demonstrates a basic Socket Mode client that listens for
+// Events API events, interactive components, and slash commands.
+//
+// Socket Mode requires two tokens:
+//
+//   - App-level token (xapp-…): opens the WebSocket connection via
+//     apps.connections.open. Generate one in your app settings under
+//     Basic Information → App-Level Tokens with the connections:write scope.
+//
+//   - Bot token (xoxb-…): used for all Web API calls (posting messages,
+//     opening views, etc.). This is the token you get after installing the
+//     app to a workspace.
+//
+// The bot token is passed to slack.New() as the primary credential; the
+// app-level token is passed via slack.OptionAppLevelToken().
+//
+// To run:
+//
+//	export SLACK_APP_TOKEN=xapp-...
+//	export SLACK_BOT_TOKEN=xoxb-...
+//	go run examples/socketmode/socketmode.go
 package main
 
 import (
@@ -6,31 +27,32 @@ import (
 	"os"
 	"strings"
 
-	"github.com/slack-go/slack/socketmode"
-
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
+	"github.com/slack-go/slack/socketmode"
 )
 
 func main() {
 	appToken := os.Getenv("SLACK_APP_TOKEN")
 	if appToken == "" {
-		fmt.Fprintf(os.Stderr, "SLACK_APP_TOKEN must be set.\n")
+		fmt.Fprintf(os.Stderr, "SLACK_APP_TOKEN environment variable is required\n")
 		os.Exit(1)
 	}
 
 	if !strings.HasPrefix(appToken, "xapp-") {
-		fmt.Fprintf(os.Stderr, "SLACK_APP_TOKEN must have the prefix \"xapp-\".")
+		fmt.Fprintf(os.Stderr, "SLACK_APP_TOKEN must have the prefix \"xapp-\"\n")
+		os.Exit(1)
 	}
 
 	botToken := os.Getenv("SLACK_BOT_TOKEN")
 	if botToken == "" {
-		fmt.Fprintf(os.Stderr, "SLACK_BOT_TOKEN must be set.\n")
+		fmt.Fprintf(os.Stderr, "SLACK_BOT_TOKEN environment variable is required\n")
 		os.Exit(1)
 	}
 
 	if !strings.HasPrefix(botToken, "xoxb-") {
-		fmt.Fprintf(os.Stderr, "SLACK_BOT_TOKEN must have the prefix \"xoxb-\".")
+		fmt.Fprintf(os.Stderr, "SLACK_BOT_TOKEN must have the prefix \"xoxb-\"\n")
+		os.Exit(1)
 	}
 
 	api := slack.New(
@@ -76,6 +98,14 @@ func main() {
 						if err != nil {
 							fmt.Printf("failed posting message: %v", err)
 						}
+					case *slackevents.MessageEvent:
+						fmt.Printf("Message from %s: %s\n", ev.User, ev.Text)
+						if len(ev.Blocks.BlockSet) > 0 {
+							fmt.Printf("Message contains %d block(s):\n", len(ev.Blocks.BlockSet))
+							for i, block := range ev.Blocks.BlockSet {
+								fmt.Printf("  Block %d: type=%s\n", i, block.BlockType())
+							}
+						}
 					case *slackevents.MemberJoinedChannelEvent:
 						fmt.Printf("user %q joined to channel %q", ev.User, ev.Channel)
 					}
@@ -92,7 +122,7 @@ func main() {
 
 				fmt.Printf("Interaction received: %+v\n", callback)
 
-				var payload interface{}
+				var payload any
 
 				switch callback.Type {
 				case slack.InteractionTypeBlockActions:
@@ -118,7 +148,7 @@ func main() {
 
 				client.Debugf("Slash command received: %+v", cmd)
 
-				payload := map[string]interface{}{
+				payload := map[string]any{
 					"blocks": []slack.Block{
 						slack.NewSectionBlock(
 							&slack.TextBlockObject{
@@ -141,6 +171,8 @@ func main() {
 				}
 
 				client.Ack(*evt.Request, payload)
+			case socketmode.EventTypeHello:
+				client.Debugf("Hello received!")
 			default:
 				fmt.Fprintf(os.Stderr, "Unexpected event type received: %s\n", evt.Type)
 			}

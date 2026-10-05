@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -19,8 +20,7 @@ func getAllUserUIDs(ctx context.Context, client *slack.Client, pageSize int) ([]
 		// Note reassignment of pager to the value returned by Next()
 		pager, err = pager.Next(ctx)
 		if failedErr := pager.Failure(err); failedErr != nil {
-			var rateLimited *slack.RateLimitedError
-			if errors.As(failedErr, &rateLimited) && rateLimited.Retryable() {
+			if rateLimited, ok := errors.AsType[*slack.RateLimitedError](failedErr); ok && rateLimited.Retryable() {
 				fmt.Println("Rate limited by Slack API; sleeping", rateLimited.RetryAfter)
 				select {
 				case <-ctx.Done():
@@ -48,7 +48,14 @@ func getAllUserUIDs(ctx context.Context, client *slack.Client, pageSize int) ([]
 }
 
 func main() {
-	client := slack.New("YOUR_TOKEN_HERE")
+	// Get token from environment variable
+	token := os.Getenv("SLACK_BOT_TOKEN")
+	if token == "" {
+		fmt.Println("SLACK_BOT_TOKEN environment variable is required")
+		os.Exit(1)
+	}
+
+	client := slack.New(token)
 
 	uids, err := getAllUserUIDs(context.Background(), client, 1000)
 	if err != nil {

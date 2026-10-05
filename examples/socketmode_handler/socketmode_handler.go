@@ -1,3 +1,25 @@
+// This example demonstrates the SocketmodeHandler, a higher-level API that
+// routes Socket Mode events to registered handler functions instead of
+// requiring a manual event-loop switch.
+//
+// Socket Mode requires two tokens:
+//
+//   - App-level token (xapp-…): opens the WebSocket connection via
+//     apps.connections.open. Generate one in your app settings under
+//     Basic Information → App-Level Tokens with the connections:write scope.
+//
+//   - Bot token (xoxb-…): used for all Web API calls (posting messages,
+//     opening views, etc.). This is the token you get after installing the
+//     app to a workspace.
+//
+// The bot token is passed to slack.New() as the primary credential; the
+// app-level token is passed via slack.OptionAppLevelToken().
+//
+// To run:
+//
+//	export SLACK_APP_TOKEN=xapp-...
+//	export SLACK_BOT_TOKEN=xoxb-...
+//	go run examples/socketmode_handler/socketmode_handler.go
 package main
 
 import (
@@ -6,10 +28,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
-
-	"github.com/slack-go/slack"
 )
 
 func main() {
@@ -49,16 +70,15 @@ func main() {
 	socketmodeHandler.Handle(socketmode.EventTypeConnecting, middlewareConnecting)
 	socketmodeHandler.Handle(socketmode.EventTypeConnectionError, middlewareConnectionError)
 	socketmodeHandler.Handle(socketmode.EventTypeConnected, middlewareConnected)
+	socketmodeHandler.Handle(socketmode.EventTypeHello, middlewareHello)
 
-	//\\ EventTypeEventsAPI //\\
-	// Handle all EventsAPI
+	// EventTypeEventsAPI: handle all EventsAPI
 	socketmodeHandler.Handle(socketmode.EventTypeEventsAPI, middlewareEventsAPI)
 
 	// Handle a specific event from EventsAPI
 	socketmodeHandler.HandleEvents(slackevents.AppMention, middlewareAppMentionEvent)
 
-	//\\ EventTypeInteractive //\\
-	// Handle all Interactive Events
+	// EventTypeInteractive: handle all Interactive Events
 	socketmodeHandler.Handle(socketmode.EventTypeInteractive, middlewareInteractive)
 
 	// Handle a specific Interaction
@@ -68,7 +88,8 @@ func main() {
 	socketmodeHandler.Handle(socketmode.EventTypeSlashCommand, middlewareSlashCommand)
 	socketmodeHandler.HandleSlashCommand("/rocket", middlewareSlashCommand)
 
-	// socketmodeHandler.HandleDefault(middlewareDefault)
+	// Handle all other events
+	socketmodeHandler.HandleDefault(middlewareDefault)
 
 	socketmodeHandler.RunEventLoop()
 }
@@ -83,6 +104,10 @@ func middlewareConnectionError(evt *socketmode.Event, client *socketmode.Client)
 
 func middlewareConnected(evt *socketmode.Event, client *socketmode.Client) {
 	fmt.Println("Connected to Slack with Socket Mode.")
+}
+
+func middlewareHello(evt *socketmode.Event, client *socketmode.Client) {
+	fmt.Println("Received a hello message. Howdy to you too.")
 }
 
 func middlewareEventsAPI(evt *socketmode.Event, client *socketmode.Client) {
@@ -102,7 +127,7 @@ func middlewareEventsAPI(evt *socketmode.Event, client *socketmode.Client) {
 		innerEvent := eventsAPIEvent.InnerEvent
 		switch ev := innerEvent.Data.(type) {
 		case *slackevents.AppMentionEvent:
-			fmt.Printf("We have been mentionned in %v", ev.Channel)
+			fmt.Printf("We have been mentioned in %v", ev.Channel)
 			_, _, err := client.Client.PostMessage(ev.Channel, slack.MsgOptionText("Yes, hello.", false))
 			if err != nil {
 				fmt.Printf("failed posting message: %v", err)
@@ -131,7 +156,7 @@ func middlewareAppMentionEvent(evt *socketmode.Event, client *socketmode.Client)
 		return
 	}
 
-	fmt.Printf("We have been mentionned in %v\n", ev.Channel)
+	fmt.Printf("We have been mentioned in %v\n", ev.Channel)
 	_, _, err := client.Client.PostMessage(ev.Channel, slack.MsgOptionText("Yes, hello.", false))
 	if err != nil {
 		fmt.Printf("failed posting message: %v", err)
@@ -147,7 +172,7 @@ func middlewareInteractive(evt *socketmode.Event, client *socketmode.Client) {
 
 	fmt.Printf("Interaction received: %+v\n", callback)
 
-	var payload interface{}
+	var payload any
 
 	switch callback.Type {
 	case slack.InteractionTypeBlockActions:
@@ -177,7 +202,7 @@ func middlewareSlashCommand(evt *socketmode.Event, client *socketmode.Client) {
 
 	client.Debugf("Slash command received: %+v", cmd)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"blocks": []slack.Block{
 			slack.NewSectionBlock(
 				&slack.TextBlockObject{
@@ -201,5 +226,5 @@ func middlewareSlashCommand(evt *socketmode.Event, client *socketmode.Client) {
 }
 
 func middlewareDefault(evt *socketmode.Event, client *socketmode.Client) {
-	// fmt.Fprintf(os.Stderr, "Unexpected event type received: %s\n", evt.Type)
+	fmt.Fprintf(os.Stderr, "Unexpected event type received: %s\n", evt.Type)
 }

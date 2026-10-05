@@ -1,7 +1,8 @@
-package tokens
+package main
 
 import (
 	"fmt"
+
 	"github.com/slack-go/slack"
 )
 

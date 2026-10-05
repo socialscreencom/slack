@@ -43,6 +43,7 @@ func TestAttachment_UnmarshalMarshalJSON_WithBlocks(t *testing.T) {
       }
     ],
     "color": "#13A554",
+    "hide_color": true,
     "fallback": "[no preview available]"
   }`
 
@@ -58,8 +59,8 @@ func TestAttachment_UnmarshalMarshalJSON_WithBlocks(t *testing.T) {
 	}
 
 	var (
-		actual   interface{}
-		expected interface{}
+		actual   any
+		expected any
 	)
 	if err = json.Unmarshal([]byte(originalAttachmentJson), &expected); err != nil {
 		t.Fatal(err)
